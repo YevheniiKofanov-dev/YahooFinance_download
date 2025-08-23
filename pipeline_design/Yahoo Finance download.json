@@ -1,0 +1,125 @@
+{
+  "name": "Yahoo Finance download",
+  "email_notifications": {
+    "no_alert_for_skipped_runs": false
+  },
+  "webhook_notifications": {},
+  "timeout_seconds": 0,
+  "trigger": {
+    "pause_status": "UNPAUSED",
+    "periodic": {
+      "interval": 3,
+      "unit": "HOURS"
+    }
+  },
+  "max_concurrent_runs": 1,
+  "tasks": [
+    {
+      "task_key": "Set_parameters",
+      "run_if": "ALL_SUCCESS",
+      "notebook_task": {
+        "notebook_path": "/Workspace/Users/yevhenii.kofanov@outlook.com/yahoo_finance/bronze/YahooFinance_input_parameters",
+        "source": "WORKSPACE"
+      },
+      "job_cluster_key": "Yahoo_Finance_cluster",
+      "timeout_seconds": 0,
+      "email_notifications": {},
+      "webhook_notifications": {}
+    },
+    {
+      "task_key": "Incremental_ingestion_to_bronze",
+      "depends_on": [
+        {
+          "task_key": "Set_parameters"
+        }
+      ],
+      "run_if": "ALL_SUCCESS",
+      "for_each_task": {
+        "inputs": "{{tasks.Set_parameters.values.output_key}}",
+        "task": {
+          "task_key": "Incremental_ingestion_to_bronze_iteration",
+          "run_if": "ALL_SUCCESS",
+          "notebook_task": {
+            "notebook_path": "/Workspace/Users/yevhenii.kofanov@outlook.com/yahoo_finance/bronze/YahooFinance_ingest_bronze",
+            "base_parameters": {
+              "ticker": "{{input.ticker}}"
+            },
+            "source": "WORKSPACE"
+          },
+          "job_cluster_key": "Yahoo_Finance_cluster",
+          "libraries": [
+            {
+              "pypi": {
+                "package": "yfinance"
+              }
+            }
+          ],
+          "timeout_seconds": 0,
+          "email_notifications": {},
+          "webhook_notifications": {}
+        }
+      },
+      "timeout_seconds": 0,
+      "email_notifications": {},
+      "webhook_notifications": {}
+    },
+    {
+      "task_key": "Insert_into_silver",
+      "depends_on": [
+        {
+          "task_key": "Incremental_ingestion_to_bronze"
+        }
+      ],
+      "run_if": "ALL_SUCCESS",
+      "notebook_task": {
+        "notebook_path": "/Workspace/Users/yevhenii.kofanov@outlook.com/yahoo_finance/silver/YahooFinance_process_silver",
+        "source": "WORKSPACE"
+      },
+      "job_cluster_key": "Yahoo_Finance_cluster",
+      "timeout_seconds": 0,
+      "email_notifications": {},
+      "webhook_notifications": {}
+    },
+    {
+      "task_key": "Insert_data_into_gold",
+      "depends_on": [
+        {
+          "task_key": "Insert_into_silver"
+        }
+      ],
+      "run_if": "ALL_SUCCESS",
+      "notebook_task": {
+        "notebook_path": "/Workspace/Users/yevhenii.kofanov@outlook.com/yahoo_finance/gold/YahooFinance_process_gold",
+        "source": "WORKSPACE"
+      },
+      "job_cluster_key": "Yahoo_Finance_cluster",
+      "timeout_seconds": 0,
+      "email_notifications": {},
+      "webhook_notifications": {}
+    }
+  ],
+  "job_clusters": [
+    {
+      "job_cluster_key": "Yahoo_Finance_cluster",
+      "new_cluster": {
+        "cluster_name": "",
+        "spark_version": "17.1.x-scala2.13",
+        "node_type_id": "Standard_DS3_v2",
+        "spark_env_vars": {
+          "PYSPARK_PYTHON": "/databricks/python3/bin/python3"
+        },
+        "data_security_mode": "DATA_SECURITY_MODE_STANDARD",
+        "runtime_engine": "PHOTON",
+        "kind": "CLASSIC_PREVIEW",
+        "is_single_node": true
+      }
+    }
+  ],
+  "queue": {
+    "enabled": true
+  },
+  "performance_target": "STANDARD",
+  "run_as": {
+    "user_name": "yevhenii.kofanov@outlook.com"
+  }
+}
